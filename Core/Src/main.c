@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
 #include "hw_130.h"
+#include "motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -144,6 +145,10 @@ int main(void)
 
   start_hw_130(	motor_driver);
 
+  volatile motor_manager_t control_driver = NULL;
+
+  control_driver = start_motion_control_timer(motor_driver, 35, &htim10);
+
 
 
   /* USER CODE END 2 */
@@ -190,6 +195,7 @@ int main(void)
 	  	  /*
 	  	   * 4 motor change + update
 	  	   * 156 uS @ 16 MHz -> ~2500 clock cycles.
+	  	   * 31 uS @ 80 MHz.
 	  	   */
 	  pwm = 85;
 	  direction = forwards;
