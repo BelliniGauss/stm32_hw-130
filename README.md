@@ -7,6 +7,13 @@ an example of usage is present in Core -> Src -> main.c
 
 ### Setup
 
+The following is only the code-side setup. 
+Other necessary steps, omitted here, includes: 
+- finding the correct GPIO mapping
+- finding timer and their channel associated to the pwm pins
+- setting up those GPIO and timer. 
+
+
 Setup is composed by 3 steps: 
 
 #### Creation of the memory structure:

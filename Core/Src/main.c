@@ -55,10 +55,6 @@
 
 
 
-TIM_HandleTypeDef htim2;
-
-
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,6 +64,7 @@ TIM_HandleTypeDef htim2;
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim10;
 
 /* USER CODE BEGIN PV */
 
@@ -77,6 +74,7 @@ TIM_HandleTypeDef htim2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM10_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -129,6 +127,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
 
   hw_130_driver motor_driver =  create_hw_130(	SR_DATA_Pin, SR_DATA_GPIO_Port,
@@ -164,7 +163,7 @@ int main(void)
 	  int pwm = 75;
 	  motor_rotation direction = forwards;
 	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
+	  motor_set(motor_driver, 1, forwards, pwm);
 	  motor_set(motor_driver, 2, direction, pwm);
 	  motor_set(motor_driver, 3, direction, pwm);
 	  update_motors(motor_driver);
@@ -393,6 +392,37 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 2 */
   HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
+  * @brief TIM10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM10_Init(void)
+{
+
+  /* USER CODE BEGIN TIM10_Init 0 */
+
+  /* USER CODE END TIM10_Init 0 */
+
+  /* USER CODE BEGIN TIM10_Init 1 */
+
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 0;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 65535;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM10_Init 2 */
+
+  /* USER CODE END TIM10_Init 2 */
 
 }
 

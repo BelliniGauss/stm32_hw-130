@@ -238,8 +238,11 @@ static void shift_out(hw_130_driver driver, uint8_t data) {
 
 static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
 
+	// for readability we save in a nicer form the pwm data:
 	TIM_HandleTypeDef* const htim = pwm_interface.htim;
 	uint32_t channel = pwm_interface.channel;
+
+	// checking values within max / min
 	if (duty_cycle > 100) duty_cycle = 100;
 	if (duty_cycle < 0) duty_cycle = 0;
 
