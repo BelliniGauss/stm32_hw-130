@@ -8,6 +8,10 @@
 #define SR_IDX_LATCH 2
 
 
+#define DIRECT_GPIO_SET(port, pin)  	( (port)->BSRR = (pin) )
+#define DIRECT_GPIO_RESET(port, pin)  	( (port)->BSRR = (uint32_t)(pin) << 16U)
+
+
 
 /*############################
  * Types and enum:
@@ -44,7 +48,7 @@ typedef motors *hw_130_driver;
  */
 
 static void shift_out(hw_130_driver driver, uint8_t data);
-static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle);
+/*__attribute__((always_inline))*/ static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle);
 
 
 
@@ -71,8 +75,8 @@ void motor_set(	hw_130_driver motor_driver,
 }
 
 
+
 /**
- * 139.25 uS max @ 16 MHz -> ~2228 clock cycle. duty
  */
 void update_motors(hw_130_driver motor_driver){
 
@@ -80,15 +84,15 @@ void update_motors(hw_130_driver motor_driver){
 
 	//	Preparing the control byte and setting correct duty cycle in the state
 	for(int i = 0; i<4; i++){
-		float duty_cycle = motor_driver->state[i].speed;
+		//float duty_cycle = motor_driver->state[i].speed;
 		switch(motor_driver->state[i].rotation){
 		case stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
-			duty_cycle = 0;		// for free wheeling
+			motor_driver->state[i].speed = 0;  	// for free wheeling
 			break;
 		case hard_stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
-			duty_cycle = 100;	// for Hard braking.
+			motor_driver->state[i].speed = 100;		// for Hard braking.
 			break;
 		case forwards:
 			if(motor_driver->invert[i]){
@@ -111,14 +115,21 @@ void update_motors(hw_130_driver motor_driver){
 			// Should I do anything here? probably not.
 			break;
 		}
-		motor_driver->state[i].speed = duty_cycle;
+		//motor_driver->state[i].speed = duty_cycle;
 	}
 
 	//	Pushing out PWM setting and control byte to shift register.
 	shift_out( motor_driver, control_byte);
+
+	/*		//	using direct calling instead of for cycle spares 98 clock cycles, or 7.3 % over the update_motors fn
 	for(int i = 0; i<4; i++){
 		set_duty_cycle((motor_driver->pwm_timer[i]), motor_driver->state[i].speed);
-	}
+	}*/
+	set_duty_cycle((motor_driver->pwm_timer[0]), motor_driver->state[0].speed);
+	set_duty_cycle((motor_driver->pwm_timer[1]), motor_driver->state[1].speed);
+	set_duty_cycle((motor_driver->pwm_timer[2]), motor_driver->state[2].speed);
+	set_duty_cycle((motor_driver->pwm_timer[3]), motor_driver->state[3].speed);
+
 }
 
 
@@ -213,36 +224,56 @@ int start_hw_130(hw_130_driver motor_driver)
  #############################
  */
 
-
 static void shift_out(hw_130_driver driver, uint8_t data) {
 
-	HAL_GPIO_WritePin(driver->sr_port[SR_IDX_LATCH], driver->sr_pin[SR_IDX_LATCH], GPIO_PIN_RESET);
-	__NOP();
+	//	Copying GPIO data to local variable for increased speed
+	GPIO_TypeDef *d_port = driver->sr_port[SR_IDX_DATA];
+	GPIO_TypeDef *c_port = driver->sr_port[SR_IDX_CLOCK];
+	GPIO_TypeDef *l_port = driver->sr_port[SR_IDX_LATCH];
+
+	int d_pin = driver->sr_pin[SR_IDX_DATA];
+	int c_pin = driver->sr_pin[SR_IDX_CLOCK];
+	int l_pin = driver->sr_pin[SR_IDX_LATCH];
+
+
+	//	Disabling SR latch:
+	DIRECT_GPIO_RESET(l_port, l_pin);
+
     for (int i = 7; i >= 0; i--) {
-        HAL_GPIO_WritePin(driver->sr_port[SR_IDX_DATA], driver->sr_pin[SR_IDX_DATA], (data & (1 << i)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-        __NOP();
-        HAL_GPIO_WritePin(driver->sr_port[SR_IDX_CLOCK], driver->sr_pin[SR_IDX_CLOCK], GPIO_PIN_SET);
-        __NOP();
-        __NOP();
-        HAL_GPIO_WritePin(driver->sr_port[SR_IDX_CLOCK], driver->sr_pin[SR_IDX_CLOCK], GPIO_PIN_RESET);
-        __NOP();
+
+    	// clock low:
+    	DIRECT_GPIO_RESET(c_port, c_pin);
+
+    	//	Data bit out:
+        if(data & (1 << i)){
+        	DIRECT_GPIO_SET(d_port, d_pin);
+        }else{
+        	DIRECT_GPIO_RESET(d_port, d_pin);
+        }
+
+        //	80 MHz, looking for > 30 nS of extra delay between
+        // 	data settled and clock out: > 2 cycle:
+        __NOP(); __NOP(); __NOP();
+
+        // Clock High
+    	DIRECT_GPIO_SET(c_port, c_pin);
     }
-    HAL_GPIO_WritePin(driver->sr_port[SR_IDX_DATA], driver->sr_pin[SR_IDX_DATA], GPIO_PIN_RESET);
-    __NOP();
-    __NOP();
+    // Reset clock and data to low:
+	DIRECT_GPIO_RESET(c_port, c_pin);
+	DIRECT_GPIO_RESET(d_port, d_pin);
+
     // Latch the data
-    HAL_GPIO_WritePin(driver->sr_port[SR_IDX_LATCH], driver->sr_pin[SR_IDX_LATCH], GPIO_PIN_SET);
-    //HAL_GPIO_WritePin(SHIFT_GPIO, SR_LATCH_PIN, GPIO_PIN_RESET);
+	DIRECT_GPIO_SET(l_port, l_pin);
 }
 
 
-static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
+
+__attribute__((always_inline)) static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
 
 	// for readability we save in a nicer form the pwm data:
 	TIM_HandleTypeDef* const htim = pwm_interface.htim;
 	uint32_t channel = pwm_interface.channel;
 
-	// checking values within max / min
 	if (duty_cycle > 100) duty_cycle = 100;
 	if (duty_cycle < 0) duty_cycle = 0;
 
@@ -250,4 +281,5 @@ static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
 
 	uint16_t pw_desired = pw_resolution * duty_cycle;
 	__HAL_TIM_SET_COMPARE(htim, channel, pw_desired);
+
 }
