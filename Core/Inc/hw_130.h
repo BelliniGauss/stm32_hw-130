@@ -96,7 +96,7 @@ void motor_set(	hw_130_driver motor_driver,
  *
  * @ param 	motor_driver -> driver 'object' in memory, obtained from create_hw_130
  */
-void update_motors(hw_130_driver motor_driver);
+void motor_update(hw_130_driver motor_driver);
 
 
 

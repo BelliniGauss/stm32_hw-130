@@ -12,6 +12,10 @@
 #define DIRECT_GPIO_RESET(port, pin)  	( (port)->BSRR = (uint32_t)(pin) << 16U)
 
 
+#define DIRECT_GPIO_SET(port, pin)  	( (port)->BSRR = (pin) )
+#define DIRECT_GPIO_RESET(port, pin)  	( (port)->BSRR = (uint32_t)(pin) << 16U)
+
+
 
 /*############################
  * Types and enum:
@@ -77,7 +81,8 @@ void motor_set(	hw_130_driver motor_driver,
 
 
 
-void update_motors(hw_130_driver motor_driver){
+
+void motor_update(hw_130_driver motor_driver){
 
 	uint8_t control_byte = 0x00;
 
@@ -88,9 +93,11 @@ void update_motors(hw_130_driver motor_driver){
 		case stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
 			motor_driver->state[i].speed = 0;  	// for free wheeling
+			motor_driver->state[i].speed = 0;  	// for free wheeling
 			break;
 		case hard_stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
+			motor_driver->state[i].speed = 100;		// for Hard braking.
 			motor_driver->state[i].speed = 100;		// for Hard braking.
 			break;
 		case forwards:
@@ -117,7 +124,7 @@ void update_motors(hw_130_driver motor_driver){
 	//	Pushing out PWM setting and control byte to shift register.
 	shift_out( motor_driver, control_byte);
 
-	//	using direct calling instead of for cycle spares 98 clock cycles, or 7.3 % over the update_motors fn...
+	//	using direct calling instead of for cycle spares 98 clock cycles, or 7.3 % over the motor_update fn...
 	set_duty_cycle((motor_driver->pwm_timer[0]), motor_driver->state[0].speed);
 	set_duty_cycle((motor_driver->pwm_timer[1]), motor_driver->state[1].speed);
 	set_duty_cycle((motor_driver->pwm_timer[2]), motor_driver->state[2].speed);
@@ -231,6 +238,7 @@ static void shift_out(hw_130_driver driver, uint8_t data) {
 
 	//	Disabling SR latch:
 	DIRECT_GPIO_RESET(l_port, l_pin);
+
 
     for (int i = 7; i >= 0; i--) {
 

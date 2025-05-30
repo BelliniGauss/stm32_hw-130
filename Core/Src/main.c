@@ -139,7 +139,7 @@ int main(void)
 
 
   motor_initialize(motor_driver,	0, &htim2, TIM_CHANNEL_1, MOTOR_SR_1_P, MOTOR_SR_1_N, MOTOR_1_INVERT);
-  motor_initialize(motor_driver,	1, &htim2, TIM_CHANNEL_2, MOTOR_SR_2_P, MOTOR_SR_2_N, MOTOR_2_INVERT);
+   motor_initialize(motor_driver,	1, &htim2, TIM_CHANNEL_2, MOTOR_SR_2_P, MOTOR_SR_2_N, MOTOR_2_INVERT);
   motor_initialize(motor_driver, 	2, &htim2, TIM_CHANNEL_3, MOTOR_SR_3_P, MOTOR_SR_3_N, MOTOR_3_INVERT);
   motor_initialize(motor_driver,	3, &htim2, TIM_CHANNEL_4, MOTOR_SR_4_P, MOTOR_SR_4_N, MOTOR_4_INVERT);
 
@@ -147,7 +147,7 @@ int main(void)
 
   motor_manager_t volatile control_driver = NULL;
 
-  control_driver = start_motion_control_timer(motor_driver, 35, &htim10);
+  control_driver = start_motion_control(motor_driver, 200, &htim10);
 
 
 
@@ -173,35 +173,46 @@ int main(void)
 	   * 4 motor change + update
 	   * 30.3 uS totale @ 80 MHz -> 2425 cycles
 	   * motor set x4 = 3.05 uS
-	   * update_motors = 27.3 uS
+	   * motor_update = 27.3 uS
 	   */
-	  int pwm = 75;
-	  motor_rotation direction = forwards;
 
+
+
+
+	  int pwm = 100;
+	  //motor_rotation direction = forwards;
+	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 	  GPIOC->ODR = 1<<14;    		// DEBUG on
-	  motor_set(motor_driver, 0, direction, pwm);
+	  GPIOC->ODR &= ~(1<<13);		//	LED on
+	  /*motor_set(motor_driver, 0, direction, pwm);
 	  motor_set(motor_driver, 1, forwards, pwm);
 	  motor_set(motor_driver, 2, direction, pwm);
 	  motor_set(motor_driver, 3, direction, pwm);
 
-	  update_motors(motor_driver);
-	  GPIOC->ODR &= ~(1<<14);		//	DEBUG off
+	  motor_update(motor_driver);*/
+
+	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
 
 
 
 
-	  HAL_Delay(0);
+	  HAL_Delay(2500);
 
-	  GPIOC->ODR = 1<<14;    		// DEBUG on
-	  direction = backwards;
+
+	  pwm = 0;
+	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
+
+	  GPIOC->ODR = 1<<13;    		// LED off
+	  //GPIOC->ODR = 1<<14;    		// DEBUG on
+	  /*direction = backwards;
 	  motor_set(motor_driver, 0, direction, pwm);
 	  motor_set(motor_driver, 1, direction, pwm);
 	  motor_set(motor_driver, 2, direction, pwm);
 	  motor_set(motor_driver, 3, direction, pwm);
 
-	  update_motors(motor_driver);
-	  GPIOC->ODR &= ~(1<<14);		//	DEBUG off
-	  HAL_Delay(0);
+	  motor_update(motor_driver);*/
+	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
+	  HAL_Delay(2500);
 
 
 	  //########################################àààà
@@ -222,7 +233,7 @@ int main(void)
 	  motor_set(motor_driver, 2, direction, pwm);
 	  motor_set(motor_driver, 3, direction, pwm);
 	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG on
-	  update_motors(motor_driver);
+	  motor_update(motor_driver);
 	  //GPIOC->ODR = 1<<14;    		// DEBUG off
 
 
@@ -301,9 +312,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 15;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 512;
+  htim2.Init.Period = 1024;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
