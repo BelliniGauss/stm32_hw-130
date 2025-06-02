@@ -51,7 +51,7 @@ typedef motors *hw_130_driver;
  #############################
  */
 
-static void shift_out(hw_130_driver driver, uint8_t data);
+__attribute__((always_inline)) static inline void shift_out(hw_130_driver driver, uint8_t data);
 __attribute__((always_inline)) static inline void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle);
 
 
@@ -224,7 +224,7 @@ int start_hw_130(hw_130_driver motor_driver)
  #############################
  */
 
-static void shift_out(hw_130_driver driver, uint8_t data) {
+__attribute__((always_inline)) static inline void shift_out(hw_130_driver driver, uint8_t data) {
 
 	//	Copying GPIO data to local variable for increased speed
 	GPIO_TypeDef *d_port = driver->sr_port[SR_IDX_DATA];

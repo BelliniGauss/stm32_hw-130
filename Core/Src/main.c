@@ -66,6 +66,7 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
+TIM_HandleTypeDef htim11;
 
 /* USER CODE BEGIN PV */
 
@@ -76,6 +77,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM10_Init(void);
+static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -83,10 +85,6 @@ static void MX_TIM10_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-
-
-
 
 
 
@@ -107,6 +105,11 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
 
+	//HAL_TIM_Base_Start(&htim11);
+
+	//RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -115,6 +118,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+
 
   /* USER CODE END Init */
 
@@ -129,6 +134,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   MX_TIM10_Init();
+  MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
   hw_130_driver volatile motor_driver =  create_hw_130(	SR_DATA_Pin, SR_DATA_GPIO_Port,
@@ -139,16 +145,26 @@ int main(void)
 
 
   motor_initialize(motor_driver,	0, &htim2, TIM_CHANNEL_1, MOTOR_SR_1_P, MOTOR_SR_1_N, MOTOR_1_INVERT);
-   motor_initialize(motor_driver,	1, &htim2, TIM_CHANNEL_2, MOTOR_SR_2_P, MOTOR_SR_2_N, MOTOR_2_INVERT);
+  motor_initialize(motor_driver,	1, &htim2, TIM_CHANNEL_2, MOTOR_SR_2_P, MOTOR_SR_2_N, MOTOR_2_INVERT);
   motor_initialize(motor_driver, 	2, &htim2, TIM_CHANNEL_3, MOTOR_SR_3_P, MOTOR_SR_3_N, MOTOR_3_INVERT);
   motor_initialize(motor_driver,	3, &htim2, TIM_CHANNEL_4, MOTOR_SR_4_P, MOTOR_SR_4_N, MOTOR_4_INVERT);
 
   start_hw_130(	motor_driver);
 
-  motor_manager_t volatile control_driver = NULL;
+  motorManager_struct *volatile control_driver = NULL;
+
+  RCC->APB2ENR |= RCC_APB2ENR_TIM11EN;
+  	TIM11->ARR = 0xFFFF;
+  	TIM11->CR1 |= TIM_CR1_CEN;
+  	HAL_TIM_Base_Start(&htim11);
 
   control_driver = start_motion_control(motor_driver, 200, &htim10);
 
+/*	//	timer clock benchmark.
+  volatile uint16_t start = TIM11->CNT;
+  	volatile uint16_t stop = TIM11->CNT;
+  	volatile uint16_t cycle = stop - start - 9;
+  	int place_holder_interrupt = 0;*/
 
 
   /* USER CODE END 2 */
@@ -182,7 +198,7 @@ int main(void)
 	  int pwm = 100;
 	  //motor_rotation direction = forwards;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
-	  GPIOC->ODR = 1<<14;    		// DEBUG on
+	  //GPIOC->ODR = 1<<14;    		// DEBUG on
 	  GPIOC->ODR &= ~(1<<13);		//	LED on
 	  /*motor_set(motor_driver, 0, direction, pwm);
 	  motor_set(motor_driver, 1, forwards, pwm);
@@ -200,6 +216,7 @@ int main(void)
 
 
 	  pwm = 0;
+
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
 	  GPIOC->ODR = 1<<13;    		// LED off
@@ -391,6 +408,37 @@ static void MX_TIM10_Init(void)
   /* USER CODE BEGIN TIM10_Init 2 */
 
   /* USER CODE END TIM10_Init 2 */
+
+}
+
+/**
+  * @brief TIM11 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM11_Init(void)
+{
+
+  /* USER CODE BEGIN TIM11_Init 0 */
+
+  /* USER CODE END TIM11_Init 0 */
+
+  /* USER CODE BEGIN TIM11_Init 1 */
+
+  /* USER CODE END TIM11_Init 1 */
+  htim11.Instance = TIM11;
+  htim11.Init.Prescaler = 0;
+  htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim11.Init.Period = 65535;
+  htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM11_Init 2 */
+
+  /* USER CODE END TIM11_Init 2 */
 
 }
 
