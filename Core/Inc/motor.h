@@ -36,7 +36,7 @@
  * 	nor modified from the user of this library, but only by the
  * 	library's functions.
 */
-typedef struct motorManager_struct motorManager_struct;
+typedef struct motorController_struct motorController_struct;
 
 
 
@@ -56,7 +56,7 @@ typedef struct motorManager_struct motorManager_struct;
  *
  * @return  ERROR or SUCCESS
  */
-ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt,
+ErrorStatus start_motion_control(	volatile motorController_struct **motorController_pt,
 									volatile hw_130_driver *hw_130,
 									int frequency,
 									TIM_HandleTypeDef *htim);
@@ -73,7 +73,7 @@ ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt
  * @return 		-> ERROR (1) if error in poarameter or execution.
  * 				-> SUCCESS (0) 	if the update was successful.
  */
-ErrorStatus set_target_speed_all(	volatile motorManager_struct *motion_controller,
+ErrorStatus set_target_speed_all(	volatile motorController_struct *motion_controller,
 									float m_1,
 									float m_2,
 									float m_3,

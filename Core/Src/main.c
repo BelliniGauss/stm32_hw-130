@@ -137,6 +137,18 @@ int main(void)
   MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
+
+
+
+
+
+
+  /*############################
+   * HW 130 driver setup:
+   #############################
+   */
+
+
   hw_130_driver volatile *motor_driver = NULL;
 
   create_hw_130(&motor_driver, 	SR_DATA_Pin, SR_DATA_GPIO_Port,
@@ -151,16 +163,30 @@ int main(void)
 
   start_hw_130(	motor_driver);
 
-  volatile motorManager_struct * control_driver = NULL;
+	/*############################
+	* HW 130 driver setup:
+	#############################
+	*/
+
+  volatile motorController_struct * control_driver = NULL;
 
   start_motion_control( &control_driver, motor_driver, 200, &htim10);
 
 
+
+
+
+
+
+
+
+
+
   //Starting tim11 for benchmarks:
-  RCC->APB2ENR |= RCC_APB2ENR_TIM11EN;
-  	TIM11->ARR = 0xFFFF;
-  	TIM11->CR1 |= TIM_CR1_CEN;
-  	HAL_TIM_Base_Start(&htim11);
+	RCC->APB2ENR |= RCC_APB2ENR_TIM11EN;
+	TIM11->ARR = 0xFFFF;
+	TIM11->CR1 |= TIM_CR1_CEN;
+	HAL_TIM_Base_Start(&htim11);
 
 
 
@@ -178,18 +204,8 @@ int main(void)
   while (1)
   {
 
-	  //GPIOC->ODR &= ~(1<<13);		//	LED on
-	  //GPIOC->ODR = 1<<14;    		// DEBUG on
-	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
-	  //GPIOC->ODR = 1<<13;    		// led off
-
 	  int pwm = 100;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
-
-	  //GPIOC->ODR = 1<<14;    		// DEBUG on
-	  GPIOC->ODR &= ~(1<<13);		//	LED on
-	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
-
 
 	  HAL_Delay(2500);
 
@@ -197,14 +213,18 @@ int main(void)
 	  pwm = 0;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
-	  GPIOC->ODR = 1<<13;    		// LED off
-	  //GPIOC->ODR = 1<<14;    		// DEBUG on
-	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
-
-
 	  HAL_Delay(2500);
 
 
+
+
+
+
+
+	  //GPIOC->ODR &= ~(1<<13);		//	LED on
+	  //GPIOC->ODR = 1<<14;    		// DEBUG on
+	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
+	  //GPIOC->ODR = 1<<13;    		// led off
 
     /* USER CODE END WHILE */
 

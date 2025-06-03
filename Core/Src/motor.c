@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <timer_bus_mapping.h>
 
-#define MAX_NUMBER_OF_DRIVERS	5
-
+#ifndef MAX_NUMBER_OF_DRIVERS
+	#define MAX_NUMBER_OF_DRIVERS	5
+#endif
 
 
 /*############################
@@ -26,12 +27,12 @@ typedef struct motionState_t{
  * Object-lilke struct, opaque to the end user.
  * Host all the information about one Motor Controller.
  */
-typedef struct motorManager_struct{
+typedef struct motorController_struct{
 	volatile hw_130_driver *driver;					/**< HW 130 driver oject, to be called for executing motor output. */
 	motionState_t state[4];					/**< Vector containing the 4 motor's motion state structs.*/
 	TIM_HandleTypeDef *interrupt_timer;		/**< pointer to the timer calling the update of the Motor Controller.*/
 	float time_increments;					/**< Precalculated time interval between two MC updates.*/
-}motorManager_struct;
+}motorController_struct;
 
 
 
@@ -56,7 +57,7 @@ typedef struct motorManager_struct{
 
 
 //	This hosts pointer to all the Motor Controller that gets registered.
-static volatile motorManager_struct *motion_controller_registered[MAX_NUMBER_OF_DRIVERS];
+static volatile motorController_struct *motion_controller_registered[MAX_NUMBER_OF_DRIVERS];
 
 //	Counts the number of Motion Controller that got registered.
 static volatile int motion_controller_registered_number = 0;
@@ -126,7 +127,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  *
  * @return  ERROR or SUCCESS
  */
-ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt,
+ErrorStatus start_motion_control(	volatile motorController_struct **motorController_pt,
 									volatile hw_130_driver *hw_130,
 									int frequency,
 									TIM_HandleTypeDef *htim){
@@ -137,7 +138,7 @@ ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt
 	}
 
 	// create in memory (and initialize to 0) the motorManager object
-	volatile motorManager_struct *new_motor_controller= calloc(1, sizeof(motorManager_struct));
+	volatile motorController_struct *new_motor_controller= calloc(1, sizeof(motorController_struct));
 	// If the initialization was not succesful, return NULL
 	if(new_motor_controller == NULL){
 		return ERROR;
@@ -171,7 +172,7 @@ ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt
 	motion_controller_registered[motion_controller_registered_number] = new_motor_controller;
 	motion_controller_registered_number ++;
 
-	*motorManager_pt = new_motor_controller;
+	*motorController_pt = new_motor_controller;
 	return SUCCESS;
 }
 
@@ -189,7 +190,7 @@ ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt
  * @return 		-> ERROR (1) if error in poarameter or execution.
  * 				-> SUCCESS (0) 	if the update was successful.
  */
-ErrorStatus set_target_speed_all( 	volatile motorManager_struct *motion_controller,
+ErrorStatus set_target_speed_all( 	volatile motorController_struct *motion_controller,
 									float m_1,
 									float m_2,
 									float m_3,
