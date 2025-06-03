@@ -24,14 +24,16 @@ has to be created by allocating the necessary memory.
 This is done in the declaration and initialization that follows:
     
     ErrorStatus create_hw_130(	volatile hw_130_driver **driver_pt,
-							int sr_data_pin, GPIO_TypeDef* data_gpio_port,
-							int	sr_clock_pin, GPIO_TypeDef* clock_gpio_port,
-							int sr_latch_pin, GPIO_TypeDef* latch_gpio_port);
+                    int sr_data_pin, GPIO_TypeDef* data_gpio_port,
+                    int	sr_clock_pin, GPIO_TypeDef* clock_gpio_port,
+                    int sr_latch_pin, GPIO_TypeDef* latch_gpio_port);
+
 Example:
+
     hw_130_driver volatile *motor_driver = NULL;
     ErrorStyatus result = create_hw_130(&motor_driver, 	SR_DATA_Pin, SR_DATA_GPIO_Port,
-                                                        SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
-                                                        SR_LATCH_Pin, SR_LATCH_GPIO_Port);
+                                        SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
+                                        SR_LATCH_Pin, SR_LATCH_GPIO_Port);
     
  - hw_130_driver is the type for the hw-130 driver used in the context of this library,
  - motor_driver is a pointer to the driver struct containing the state. 
@@ -51,7 +53,9 @@ As of now it's necessary to initialize ALL the four motors.
                                     int pin_positive,
                                     int pin_negative,
                                     bool invert_default_direction);
+
 Example:
+
     motor_initialize(motor_driver,	0, &htim2, TIM_CHANNEL_1, MOTOR_SR_1_P, MOTOR_SR_1_N, MOTOR_1_INVERT);
 
 the initialization function takes in, in order:
@@ -63,20 +67,6 @@ the initialization function takes in, in order:
 - index of negative side L293D input in the Shift Register pinout
 - bool flag signaling the default rotation direction should be inverted. 
 
-/**
- * @brief	Setupt the initial memory for hw 130 driver,
- * 			setup of Shift Register, initialize PWM outputs to zero.
- *
- * @param driver_pt			-> pointer to the pointer to containg the newly created driver.
- * @param sr_data_pin 		-> pin number of the shift register's data pin.
- * @param sr_clock_pin 		-> pin number of the shift register's clock pin.
- * @param sr_latch_pin 		-> pin number of the shift register's latch pin.
- * @param data_gpio_port 	-> PORT (A, B, ...) of the shift register's data pin.
- * @param clock_gpio_port 	-> PORT (A, B, ...) of the shift register's clock pin.
- * @param latch_gpio_port 	-> PORT (A, B, ...) of the shift register's latch pin.
- *
- * @returns -> 	ERROR or SUCCESS.
- */
 
 #### Initialization of the driver: 
 
@@ -84,18 +74,13 @@ This will reset the Shift Register to default zero, making the motor stationary 
 Will also initialize the pwm output on the selected timers and channels. 
     
     ErrorStatus start_hw_130(volatile hw_130_driver *motor_driver);
+
 Example: 
+
     start_hw_130(motor_driver);
 
 It simply takes in the the hw-130 object that we want to actually start up. 
-/**
- * @brief	Setupt the initial state of Shift Register and
- * 			fires up the PWM outputs.
- *
- * @param 	motor_driver -> pointer to driver 'object' in memory, obtained from create_hw_130
- *
- * @returns -> ERROR or SUCCESS
- */
+
 
 
 
@@ -114,6 +99,7 @@ that can manage more than one hw130 driver.
                                         int frequency,
                                         TIM_HandleTypeDef *htim);
 Example:
+
     volatile motorManager_struct * control_driver = NULL;
     start_motion_control( &control_driver, motor_driver, 200, &htim10);
 
@@ -123,16 +109,6 @@ It then takes an hw_130 driver as initialized before.
 A frequency: this is the update frequency of the ramp control loop.
 A timer handler to the timer used for generating the update at the required frequency. It cannot be shared. 
 
-/**
- * @brief 	This function initializa a Motion Controller. To be called before any other fn.
- *
- * @param 	motorManager_pt -> pointer to the pointer that will host the state-like struct.
- * @param 	hw_130 			-> actual driver for the motors, to be used by the Motor Controller.
- * @param 	frequency 		-> call frequency of the low level control. Suggested max (@80 MHz) 2500 Hz
- * @param 	*htim 			-> handler for the timer managing the low level control. Cannot be shared with other.
- *
- * @return  ERROR or SUCCESS
- */
 
 
 ### Operation: 
@@ -154,13 +130,3 @@ and the max acceeleration admissible.
 
 This will setup the library and start the requested ramp. 
 
-/**
- * @brief 	This function sets a new speed request for the Motor Controller. Acts on all 4 motors.
- *
- * @param   *motion_controller 	-> pointer to the state-like struct of the Motor Controller, as returned by the start function.
- * @param	m_1 ... m_4 		-> spee setpoint for the 4 motors, in the interval (-100;+100).
- * @param 	acc 				-> Max acceleration for the ramp. Expressed in % points per seconds. Ex: 50 -> max 50%/sec.
- *
- * @return 		-> ERROR (1) if error in poarameter or execution.
- * 				-> SUCCESS (0) 	if the update was successful.
- */
