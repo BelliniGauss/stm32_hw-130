@@ -24,16 +24,16 @@ has to be created by allocating the necessary memory.
 This is done in the declaration and initialization that follows:
     
     ErrorStatus create_hw_130(	volatile hw_130_driver **driver_pt,
-                    int sr_data_pin, GPIO_TypeDef* data_gpio_port,
-                    int	sr_clock_pin, GPIO_TypeDef* clock_gpio_port,
-                    int sr_latch_pin, GPIO_TypeDef* latch_gpio_port);
+                            int sr_data_pin, GPIO_TypeDef* data_gpio_port,
+                            int	sr_clock_pin, GPIO_TypeDef* clock_gpio_port,
+                            int sr_latch_pin, GPIO_TypeDef* latch_gpio_port);
 
 Example:
 
     hw_130_driver volatile *motor_driver = NULL;
     ErrorStyatus result = create_hw_130(&motor_driver, 	SR_DATA_Pin, SR_DATA_GPIO_Port,
-                                        SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
-                                        SR_LATCH_Pin, SR_LATCH_GPIO_Port);
+                                                SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
+                                                SR_LATCH_Pin, SR_LATCH_GPIO_Port);
     
  - hw_130_driver is the type for the hw-130 driver used in the context of this library,
  - motor_driver is a pointer to the driver struct containing the state. 
@@ -95,9 +95,10 @@ We can create more than one (up to 5 by default, can be changed by defining MAX_
 that can manage more than one hw130 driver. 
 
     ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt,
-                                        volatile hw_130_driver *hw_130,
-                                        int frequency,
-                                        TIM_HandleTypeDef *htim);
+                                            volatile hw_130_driver *hw_130,
+                                            int frequency,
+                                            TIM_HandleTypeDef *htim);
+
 Example:
 
     volatile motorManager_struct * control_driver = NULL;
@@ -117,12 +118,14 @@ We'll focus only on the usage trough the ramp function:
 
 
     ErrorStatus set_target_speed_all(	volatile motorManager_struct *motion_controller,
-                                        float m_1,
-                                        float m_2,
-                                        float m_3,
-                                        float m_4,
-                                        float acc);
+                                            float m_1,
+                                            float m_2,
+                                            float m_3,
+                                            float m_4,
+                                            float acc);
+
 Example: 
+
     set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);        
 
 The usage is intuitive, pass a controller, the 4 desired pwm [-100;+100] 
