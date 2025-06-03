@@ -49,14 +49,17 @@ typedef struct motorManager_struct motorManager_struct;
 /**
  * @brief 	This function initializa a Motion Controller. To be called before any other fn.
  *
- * @param 	hw_130 		-> actual driver for the motors, to be used by the Motor Controller.
- * @param 	frequency 	-> call frequency of the low level control. Suggested max (@80 MHz) 2500 Hz
- * @param 	*htim 		-> handler for the timer managing the low level control. Cannot be shared with other.
+ * @param 	motorManager_pt -> pointer to the pointer that will host the state-like struct.
+ * @param 	hw_130 			-> actual driver for the motors, to be used by the Motor Controller.
+ * @param 	frequency 		-> call frequency of the low level control. Suggested max (@80 MHz) 2500 Hz
+ * @param 	*htim 			-> handler for the timer managing the low level control. Cannot be shared with other.
  *
- * @return  motorManager_struct* -> Pointer to the newly created state-like struct containing all the parameters
- * 									of the Motor Controler.
+ * @return  ERROR or SUCCESS
  */
-motorManager_struct* start_motion_control( hw_130_driver hw_130, int frequency, TIM_HandleTypeDef *htim);
+ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt,
+									volatile hw_130_driver *hw_130,
+									int frequency,
+									TIM_HandleTypeDef *htim);
 
 
 
@@ -66,8 +69,16 @@ motorManager_struct* start_motion_control( hw_130_driver hw_130, int frequency, 
  * @param   *motion_controller 	-> pointer to the state-like struct of the Motor Controller, as returned by the start function.
  * @param	m_1 ... m_4 		-> spee setpoint for the 4 motors, in the interval (-100;+100).
  * @param 	acc 				-> Max acceleration for the ramp. Expressed in % points per seconds. Ex: 50 -> max 50%/sec.
+ *
+ * @return 		-> ERROR (1) if error in poarameter or execution.
+ * 				-> SUCCESS (0) 	if the update was successful.
  */
-void set_target_speed_all(motorManager_struct *motion_controller, float m_1, float m_2, float m_3, float m_4, float acc);
+ErrorStatus set_target_speed_all(	volatile motorManager_struct *motion_controller,
+									float m_1,
+									float m_2,
+									float m_3,
+									float m_4,
+									float acc);
 
 // Todo
 

@@ -137,11 +137,11 @@ int main(void)
   MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
-  hw_130_driver volatile motor_driver =  create_hw_130(	SR_DATA_Pin, SR_DATA_GPIO_Port,
-												SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
-												SR_LATCH_Pin, SR_LATCH_GPIO_Port);
+  hw_130_driver volatile *motor_driver = NULL;
 
-
+  create_hw_130(&motor_driver, 	SR_DATA_Pin, SR_DATA_GPIO_Port,
+								SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
+								SR_LATCH_Pin, SR_LATCH_GPIO_Port);
 
 
   motor_initialize(motor_driver,	0, &htim2, TIM_CHANNEL_1, MOTOR_SR_1_P, MOTOR_SR_1_N, MOTOR_1_INVERT);
@@ -151,14 +151,18 @@ int main(void)
 
   start_hw_130(	motor_driver);
 
-  motorManager_struct *volatile control_driver = NULL;
+  volatile motorManager_struct * control_driver = NULL;
 
+  start_motion_control( &control_driver, motor_driver, 200, &htim10);
+
+
+  //Starting tim11 for benchmarks:
   RCC->APB2ENR |= RCC_APB2ENR_TIM11EN;
   	TIM11->ARR = 0xFFFF;
   	TIM11->CR1 |= TIM_CR1_CEN;
   	HAL_TIM_Base_Start(&htim11);
 
-  control_driver = start_motion_control(motor_driver, 200, &htim10);
+
 
 /*	//	timer clock benchmark.
   volatile uint16_t start = TIM11->CNT;
@@ -179,82 +183,28 @@ int main(void)
 	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
 	  //GPIOC->ODR = 1<<13;    		// led off
 
-
-
-
-	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG on
-	  /*
-	   * GPIO on&Off -> 1.75 uS
-	   * GPIO off & on ->
-	   * 4 motor change + update
-	   * 30.3 uS totale @ 80 MHz -> 2425 cycles
-	   * motor set x4 = 3.05 uS
-	   * motor_update = 27.3 uS
-	   */
-
-
-
-
 	  int pwm = 100;
-	  //motor_rotation direction = forwards;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
+
 	  //GPIOC->ODR = 1<<14;    		// DEBUG on
 	  GPIOC->ODR &= ~(1<<13);		//	LED on
-	  /*motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, forwards, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-
-	  motor_update(motor_driver);*/
-
 	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
-
-
 
 
 	  HAL_Delay(2500);
 
 
 	  pwm = 0;
-
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
 	  GPIOC->ODR = 1<<13;    		// LED off
 	  //GPIOC->ODR = 1<<14;    		// DEBUG on
-	  /*direction = backwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-
-	  motor_update(motor_driver);*/
 	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
+
+
 	  HAL_Delay(2500);
 
 
-	  //########################################àààà
-
-
-	  //GPIOC->ODR &= ~(1<<13);		//	LED on
-	  	  /*
-	  	   * 4 motor change + update
-	  	   * 156 uS @ 16 MHz -> ~2500 clock cycles.
-	  	   * 31 uS @ 80 MHz.
-	  	   */
-
-	  /*
-	  pwm = 85;
-	  direction = forwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG on
-	  motor_update(motor_driver);
-	  //GPIOC->ODR = 1<<14;    		// DEBUG off
-
-
-	  HAL_Delay(3);*/
 
     /* USER CODE END WHILE */
 

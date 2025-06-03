@@ -1,8 +1,8 @@
 #include "motor.h"
-
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
+#include <timer_bus_mapping.h>
 
 #define MAX_NUMBER_OF_DRIVERS	5
 
@@ -27,7 +27,7 @@ typedef struct motionState_t{
  * Host all the information about one Motor Controller.
  */
 typedef struct motorManager_struct{
-	hw_130_driver driver;					/**< HW 130 driver oject, to be called for executing motor output. */
+	volatile hw_130_driver *driver;					/**< HW 130 driver oject, to be called for executing motor output. */
 	motionState_t state[4];					/**< Vector containing the 4 motor's motion state structs.*/
 	TIM_HandleTypeDef *interrupt_timer;		/**< pointer to the timer calling the update of the Motor Controller.*/
 	float time_increments;					/**< Precalculated time interval between two MC updates.*/
@@ -48,7 +48,12 @@ typedef struct motorManager_struct{
 #define DIVIDER_MAX 	0xFFFF			//	2^16 -1
 #define VALUE_MAX 		0xFFFFFFFF		//	2^32 -1
 
+#define FREQUENCY_MAX	20000
+#define FREQUENCY_MIN	0.1
+
+
 #define NULL_IDX -1
+
 
 //	This hosts pointer to all the Motor Controller that gets registered.
 static volatile motorManager_struct *motion_controller_registered[MAX_NUMBER_OF_DRIVERS];
@@ -65,8 +70,25 @@ static volatile int motion_controller_registered_number = 0;
  #############################
  */
 
-static int set_timer_frequency(uint32_t timer_desired_frequency, TIM_HandleTypeDef *htim);
-static uint32_t get_tim_clock(TIM_HandleTypeDef *htim);
+/**
+ * @brief 	given a timer and a desired reset frequency will set the prescaler
+ * 			and TOP value to archieve such frequency
+ *
+ * @param desired_frequency -> Desired time rfrequency in Hz
+ * @param htim -> memory address of the timer to modify
+ *
+ * @return -> -1 if error occurred, 0 if ok
+ */
+static ErrorStatus set_timer_frequency(float desired_frequency, TIM_HandleTypeDef *htim);
+
+/**
+ * @brief 	Will return the current base frequency for a given timer
+ *
+ * @param 	htim -> memory address of the timer of interest
+ *
+ * @return 	timer's base frequency in Hz.
+ */
+static ErrorStatus get_tim_clock(TIM_HandleTypeDef *htim, int *destination_buffer);
 
 
 __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDef *htim);
@@ -82,12 +104,7 @@ __attribute__((always_inline)) inline float pwm_mechanical2electrical(float pwm_
  */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-
-
 	motion_update(htim);
-
-
-
 }
 
 
@@ -99,23 +116,35 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  #############################
  */
 
+/**
+ * @brief 	This function initializa a Motion Controller. To be called before any other fn.
+ *
+ * @param 	motorManager_pt -> pointer to the pointer that will host the state-like struct.
+ * @param 	hw_130 			-> actual driver for the motors, to be used by the Motor Controller.
+ * @param 	frequency 		-> call frequency of the low level control. Suggested max (@80 MHz) 2500 Hz
+ * @param 	*htim 			-> handler for the timer managing the low level control. Cannot be shared with other.
+ *
+ * @return  ERROR or SUCCESS
+ */
+ErrorStatus start_motion_control(	volatile motorManager_struct **motorManager_pt,
+									volatile hw_130_driver *hw_130,
+									int frequency,
+									TIM_HandleTypeDef *htim){
 
-motorManager_struct* start_motion_control( hw_130_driver hw_130,  int frequency, TIM_HandleTypeDef *htim){
-
-	//	If we already registered the max numebr of driver we return
+	//	If we already registered the max numebr of driver we return NULL pointer.
 	if(motion_controller_registered_number >= MAX_NUMBER_OF_DRIVERS){
-		return NULL;
+		return ERROR;
 	}
 
 	// create in memory (and initialize to 0) the motorManager object
-	motorManager_struct *new_motorManager= calloc(1, sizeof(motorManager_struct));
-	// If the initialization was not succesful, return error!
-	if(new_motorManager == NULL){
-		return NULL;
+	volatile motorManager_struct *new_motor_controller= calloc(1, sizeof(motorManager_struct));
+	// If the initialization was not succesful, return NULL
+	if(new_motor_controller == NULL){
+		return ERROR;
 	}
 
 	//	Registering the HW 130 driver component to it:
-	new_motorManager->driver = hw_130;
+	new_motor_controller->driver = hw_130;
 
 
 
@@ -123,74 +152,119 @@ motorManager_struct* start_motion_control( hw_130_driver hw_130,  int frequency,
 	if(set_timer_frequency(frequency, htim) != 0){
 		// Could not initialize correctly the timer:
 		// Release the memory:
-		free(new_motorManager);
-		return NULL;
+		free(new_motor_controller);
+		return ERROR;
 	}
 	if(	HAL_TIM_Base_Start_IT(htim)!= HAL_OK){
 		// Could not initialize correctly the timer:
 		// Release the memory:
-		free(new_motorManager);
-		return NULL;
+		free(new_motor_controller);
+		return ERROR;
 	}
 
 
 	//	Registering the interrupt generating timer to the motor manager.
-	new_motorManager->interrupt_timer = htim;
-	new_motorManager->time_increments = 1.0/(float)frequency;
+	new_motor_controller->interrupt_timer = htim;
+	new_motor_controller->time_increments = 1.0/(float)frequency;
 
 	// Registering the motionManager to the motor manager array.
-	motion_controller_registered[motion_controller_registered_number] = new_motorManager;
+	motion_controller_registered[motion_controller_registered_number] = new_motor_controller;
 	motion_controller_registered_number ++;
 
-	return new_motorManager;
+	*motorManager_pt = new_motor_controller;
+	return SUCCESS;
 }
 
 
 
 
 
-
-void set_target_speed_all(motorManager_struct *motion_controller, float m_1, float m_2, float m_3, float m_4, float acc){
-
-
-
-	__disable_irq();
-
-	GPIOC->ODR = 1<<14;    		// DEBUG on
-
+/**
+ * @brief 	This function sets a new speed request for the Motor Controller. Acts on all 4 motors.
+ *
+ * @param   *motion_controller 	-> pointer to the state-like struct of the Motor Controller, as returned by the start function.
+ * @param	m_1 ... m_4 		-> spee setpoint for the 4 motors, in the interval (-100;+100).
+ * @param 	acc 				-> Max acceleration for the ramp. Expressed in % points per seconds. Ex: 50 -> max 50%/sec.
+ *
+ * @return 		-> ERROR (1) if error in poarameter or execution.
+ * 				-> SUCCESS (0) 	if the update was successful.
+ */
+ErrorStatus set_target_speed_all( 	volatile motorManager_struct *motion_controller,
+									float m_1,
+									float m_2,
+									float m_3,
+									float m_4,
+									float acc){
 	// Todo aggiungere logica di treshold.
 
-	float delta [4];
+	/*############################
+	 * Checking validity of data received:
+	 #############################
+	 */
 
-	delta[0] = abs(motion_controller->state[0].current_speed - m_1);
-	delta[1] = abs(motion_controller->state[1].current_speed - m_2);
-	delta[2] = abs(motion_controller->state[2].current_speed - m_3);
-	delta[3] = abs(motion_controller->state[3].current_speed - m_4);
-
-	float delta_max = delta[0];
-	for (int i = 1; i<4 ; i++){
-		 delta_max = (delta[i] >= delta_max) ? delta[i] : delta_max;
+	//	Acceleration:
+	if(acc <= 0){
+		return ERROR;
 	}
+
+
+	//	Target speeds:
+	float targets[4] = {m_1, m_2, m_3, m_4};
+	for( int i = 0; i< 4; i++){
+		if(targets[i] < -100 || targets[i] > 100){
+			return ERROR;
+		}
+	}
+
+
+	//	Pointer to a valid Motion Controller:
+	bool pointer_valid = false;
+	for(int i = 0; i < motion_controller_registered_number; i++){
+		if(motion_controller_registered[i] == motion_controller){
+			pointer_valid = true;
+			break;
+		}
+	}
+	if( !pointer_valid){
+		return ERROR;
+	}
+
+
+	/*############################
+	 * Update of the data:
+	 #############################
+	 */
+
+	float delta [4];
+	float delta_max = 0.0f;
+
+
+	//	Disable interrupts such that we can update data consumed
+	//	by the Motion Controller ISR update.
+	__disable_irq();
+
+	for (int i = 0; i < 4; i++) {
+		delta[i] = fabsf(motion_controller->state[i].current_speed - targets[i]);
+		if (delta[i] > delta_max) {
+			delta_max = delta[i];
+		}
+	}
+
 
 	float time_acc = delta_max / acc;
 	float time_increment = motion_controller->time_increments;
 
+	for (int i = 0; i < 4; i++) {
+		motion_controller->state[i].desired_speed = targets[i];
+		motion_controller->state[i].speed_increments = (time_acc > 0) ? (delta[i] * time_increment / time_acc) : 0.0f;
+	}
 
-
-	motion_controller->state[0].desired_speed = m_1;
-	motion_controller->state[0].speed_increments = delta[0] * time_increment / time_acc;
-	motion_controller->state[1].desired_speed = m_2;
-	motion_controller->state[1].speed_increments = delta[1] * time_increment / time_acc;
-	motion_controller->state[2].desired_speed = m_3;
-	motion_controller->state[2].speed_increments = delta[2] * time_increment / time_acc;
-	motion_controller->state[3].desired_speed = m_4;
-	motion_controller->state[3].speed_increments = delta[3] * time_increment / time_acc;
-
-	GPIOC->ODR &= ~(1<<14);		//	DEBUG off
 
 	__enable_irq();
 
 
+
+	return SUCCESS;
 }
 
 
@@ -206,7 +280,6 @@ void set_target_speed_all(motorManager_struct *motion_controller, float m_1, flo
 __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDef *htim)
 {
 
-	//__disable_irq(); 	// todo verify it's not actually needed...
 
 	//	Identify interrupt generator
 	int controller_idx = NULL_IDX;
@@ -217,13 +290,12 @@ __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDe
 		}
 	}
 	if(controller_idx == NULL_IDX){
-		//	Interrupt not reelated to our motion controller.
-		//__enable_irq();
+		//	Could not find a controller associate to the timer generating interrupt.
 		return;
 	}
 
 	//	Retrieve motor's driver object.
-	hw_130_driver motors = motion_controller_registered[controller_idx]->driver;
+	volatile hw_130_driver *hw_130 = motion_controller_registered[controller_idx]->driver;
 
 
 	//	Cicle trough the 4 motors and update them.
@@ -255,6 +327,7 @@ __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDe
 		}
 
 		//	Calculating speed and rotation as requested by hw130 driver:
+		//	Also, applying a treshold such that low speed requests gets collapsed to 'stop' state.
 		float speed_abs = abs(speed);
 		motor_rotation direction = stop;
 		if(speed_abs > 2.5){
@@ -263,15 +336,15 @@ __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDe
 		float pwm_motor = pwm_mechanical2electrical(speed_abs);
 
 		//	Updating motor's driver and the Motion Controller's object/state:
-		motor_set(motors, i, direction, pwm_motor);
+		motor_set(hw_130, i, direction, pwm_motor);
 		state.current_speed = speed;
 		motion_controller_registered[controller_idx]->state[i] = state;
 
 	}
-	//__enable_irq();
 
-	//	Set those values to the hw130 driver
-	motor_update(motors);
+	//	Actually update the motor driver:
+	motor_update(hw_130);
+
 }
 
 
@@ -285,26 +358,35 @@ __attribute__((always_inline)) inline float pwm_mechanical2electrical(float pwm_
 
 
 /**
- * @brief 	given a timer and a desired frequency will set the prescaler and TOP value
- * 			to archieve such frequency
+ * @brief 	given a timer and a desired reset frequency will set the prescaler
+ * 			and TOP value to archieve such frequency
  *
- * @param timer_desired_frequency -> Desired time rfrequency in Hz
- * @param htim -> memory address of the timer to modify
+ * @param 	desired_frequency -> Desired time rfrequency in Hz
+ * @param 	htim -> memory address of the timer to modify
  *
- * return -> -1 if error occurred, 0 if ok
+ * @return 	-> ERROR if error occurred
+ * 			-> OK if setup successful.
  */
-int set_timer_frequency(uint32_t timer_desired_frequency, TIM_HandleTypeDef *htim){
+ErrorStatus set_timer_frequency(float desired_frequency, TIM_HandleTypeDef *htim){
 
-	double timer_clock = (double)get_tim_clock(htim);
-	double timer_desired_period = 1 / (double) timer_desired_frequency;
-
-	if((timer_clock*timer_desired_period) > (VALUE_MAX)){
-		return -1;
+	if(desired_frequency > FREQUENCY_MAX || desired_frequency < FREQUENCY_MIN){
+		return ERROR;
 	}
 
-	//	TODO more error checking, not only on frequency value request.
+	int timer_clock = 0;
+	ErrorStatus result =  get_tim_clock(htim, &timer_clock);
+	if(result == ERROR){
+		//get_tim_clock could not get the frequency of the desired timer.
+		return ERROR;
+	}
 
-	double scale = timer_clock / timer_desired_frequency;
+	double desired_period = 1 / (double) desired_frequency;
+	if((timer_clock * desired_period) > (VALUE_MAX)){
+		return ERROR;
+	}
+
+
+	double scale = timer_clock / desired_frequency;
 	double smallest_top = scale /  PRESCALER_MAX;
 	uint32_t top =  smallest_top + 1;
 	uint32_t prescaler = roundf( scale / (double)top);
@@ -322,7 +404,7 @@ int set_timer_frequency(uint32_t timer_desired_frequency, TIM_HandleTypeDef *hti
 	__HAL_TIM_SET_COUNTER(htim, 0);
 	//HAL_TIM_Base_Start(htim);
 
-	return 0;
+	return SUCCESS;
 }
 
 
@@ -333,29 +415,53 @@ int set_timer_frequency(uint32_t timer_desired_frequency, TIM_HandleTypeDef *hti
  *
  * @param htim -> memory address of the timer of interest
  *
- * @return 	timer's base frequency in Hz.
+ * @return 	-> ERROR if problem in getting timer's info.
+ * 			-> Timer's base frequency in Hz.
  */
-uint32_t get_tim_clock(TIM_HandleTypeDef *htim) {
+ErrorStatus get_tim_clock(TIM_HandleTypeDef *htim, int *destination_buffer) {
+
     RCC_ClkInitTypeDef clk_config;
     uint32_t latency;
     HAL_RCC_GetClockConfig(&clk_config, &latency);
 
-    // Check if timer is on APB2
-    if (htim->Instance == TIM1 ||
-        htim->Instance == TIM9 || htim->Instance == TIM10 || htim->Instance == TIM11) {
+    BusType timer_bus = getTimerBus(htim);
 
-        uint32_t pclk2 = HAL_RCC_GetPCLK2Freq();
-        if (clk_config.APB2CLKDivider != RCC_HCLK_DIV1) {
-            return pclk2 * 2;  // Timer clock is doubled
-        } else {
-            return pclk2;
-        }
-    } else {
-        uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
-        if (clk_config.APB1CLKDivider != RCC_HCLK_DIV1) {
-            return pclk1 * 2;
-        } else {
-            return pclk1;
-        }
+    switch(timer_bus){
+    case BUS_APB1:
+    	uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
+    	if (clk_config.APB1CLKDivider != RCC_HCLK_DIV1) {
+    		*destination_buffer = pclk1 * 2;
+			return SUCCESS;
+		} else {
+			*destination_buffer = pclk1;
+			return SUCCESS;
+		}
+    	break;
+    case BUS_APB2:
+
+    	uint32_t pclk2 = HAL_RCC_GetPCLK2Freq();
+		if (clk_config.APB2CLKDivider != RCC_HCLK_DIV1) {
+			*destination_buffer = pclk2 * 2;
+			return SUCCESS;
+		} else {
+			*destination_buffer = pclk2;
+			return SUCCESS;
+		}
+		break;
+
+    case BUS_UNKNOWN:
+    	//	Error:
+    	return ERROR;
+    	break;
+
+    default:
+    	//	Error:
+    	return ERROR;
+    	break;
     }
+
+    //	This point should be unreacheable.
+    //	If execution reaches this something was very wrong.
+    return ERROR;
+
 }
