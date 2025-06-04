@@ -170,7 +170,7 @@ int main(void)
 
   volatile motorController_struct * control_driver = NULL;
 
-  start_motion_control( &control_driver, motor_driver, 200, &htim10);
+  start_motion_control( &control_driver, motor_driver, 50, &htim10);
 
 
 
@@ -210,7 +210,7 @@ int main(void)
 	  HAL_Delay(2500);
 
 
-	  pwm = 0;
+	  pwm = 10;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
 	  HAL_Delay(2500);

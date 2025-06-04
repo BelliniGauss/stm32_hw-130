@@ -313,14 +313,14 @@ __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDe
 		//	Checking for the direction of adjustment and for the magnitude of the update.
 		if(delta > 0){
 			// If close to target, cap the correction to the remaining difference:
-			if(speed_variation < delta){
+			if(delta < speed_variation){
 				speed_variation = delta;
 			}
 			// speed too low. increase.
 			speed += speed_variation;
 		}else{
 			// If close to target, cap the correction to the remaining difference:
-			if(-speed_variation > delta){
+			if( delta > -speed_variation){
 				speed_variation = -delta;	// needs to make it positive for correct sign in the next step.
 			}
 			// speed too high. Lower it.
