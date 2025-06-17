@@ -1,6 +1,6 @@
-#include "motor.h"
 #include <float.h>
 #include <math.h>
+#include <motion_controller.h>
 #include <stdlib.h>
 #include <timer_bus_mapping.h>
 
@@ -46,11 +46,8 @@ typedef struct motorController_struct{
 
 
 #define PRESCALER_MAX 	0xFFFF			//	2^16 -1
-#define DIVIDER_MAX 	0xFFFF			//	2^16 -1
-#define VALUE_MAX 		0xFFFFFFFF		//	2^32 -1
-
-#define FREQUENCY_MAX	20000
-#define FREQUENCY_MIN	0.1
+#define COUNTER_MAX 	0xFFFF			//	2^16 -1
+#define VALUE_MAX 		(COUNTER_MAX * PRESCALER_MAX)		//	2^32 -1
 
 
 #define NULL_IDX -1
@@ -196,7 +193,8 @@ ErrorStatus set_target_speed_all( 	volatile motorController_struct *motion_contr
 									float m_3,
 									float m_4,
 									float acc){
-	// Todo aggiungere logica di treshold.
+
+
 
 	/*############################
 	 * Checking validity of data received:
@@ -242,6 +240,9 @@ ErrorStatus set_target_speed_all( 	volatile motorController_struct *motion_contr
 
 	//	Disable interrupts such that we can update data consumed
 	//	by the Motion Controller ISR update.
+
+
+
 	__disable_irq();
 
 	for (int i = 0; i < 4; i++) {
@@ -262,6 +263,8 @@ ErrorStatus set_target_speed_all( 	volatile motorController_struct *motion_contr
 
 
 	__enable_irq();
+
+
 
 
 
@@ -294,6 +297,7 @@ __attribute__((always_inline)) inline static void motion_update(TIM_HandleTypeDe
 		//	Could not find a controller associate to the timer generating interrupt.
 		return;
 	}
+
 
 	//	Retrieve motor's driver object.
 	volatile hw_130_driver *hw_130 = motion_controller_registered[controller_idx]->driver;
@@ -370,9 +374,9 @@ __attribute__((always_inline)) inline float pwm_mechanical2electrical(float pwm_
  */
 ErrorStatus set_timer_frequency(float desired_frequency, TIM_HandleTypeDef *htim){
 
-	if(desired_frequency > FREQUENCY_MAX || desired_frequency < FREQUENCY_MIN){
-		return ERROR;
-	}
+
+	// For now we trust we received an actual timer in *htim
+
 
 	int timer_clock = 0;
 	ErrorStatus result =  get_tim_clock(htim, &timer_clock);
@@ -381,16 +385,48 @@ ErrorStatus set_timer_frequency(float desired_frequency, TIM_HandleTypeDef *htim
 		return ERROR;
 	}
 
-	double desired_period = 1 / (double) desired_frequency;
-	if((timer_clock * desired_period) > (VALUE_MAX)){
+
+
+
+	//	Estimate of the minimum frequency we can count to, it's a
+	//	Good approximation for the top/prescaler calculation approach used.
+	double frequency_min = timer_clock / ( COUNTER_MAX * PRESCALER_MAX);
+
+	//	Given the max valid counter value is 1,
+	//	Given the min prescaler of 0, we are effectively dividing
+	//	the clock's bus freq. by TOP+1 -> freq max = BUS clock / 2
+	double frequency_max = (double)timer_clock / 2.0;
+
+	//	Checking the timer can count up to the requested frequency.
+	if(desired_frequency > frequency_max || desired_frequency < frequency_min){
+			return ERROR;
+	}
+
+
+
+
+	//	Counter Tick Target is the desired number of clock tick that should
+	//	occurre between two timer overflows.
+	double count_tick_target = timer_clock / desired_frequency;
+
+	//	Given the hypotesis of using the max available counter number,
+	//	We can find the smallest prescale possible to overflow at count_tick_target:
+	double smallest_prescaler = count_tick_target /  COUNTER_MAX;
+
+	//	Given we cannot exceed COUNTER_MAX we'll actually take the immediately
+	//	Larger prescaler, to get an admissible top value for the counter:
+	uint32_t prescaler = smallest_prescaler +1;
+
+	//	With that prescaler fixed we can calculate the actual counter top value:
+	uint32_t top = roundf( count_tick_target / (double)prescaler);
+
+
+	// Redundant check, yet better safe than sorry:
+	if( top > COUNTER_MAX || prescaler > PRESCALER_MAX){
 		return ERROR;
 	}
 
 
-	double scale = timer_clock / desired_frequency;
-	double smallest_top = scale /  PRESCALER_MAX;
-	uint32_t top =  smallest_top + 1;
-	uint32_t prescaler = roundf( scale / (double)top);
 
 
 	//	Actually setting the newfound values in the timer:
@@ -398,8 +434,8 @@ ErrorStatus set_timer_frequency(float desired_frequency, TIM_HandleTypeDef *htim
 	HAL_TIM_Base_Stop(htim);
 
 	// Set new prescaler and top counting values:
-	__HAL_TIM_SET_PRESCALER(htim, prescaler);
-	__HAL_TIM_SET_AUTORELOAD(htim, top);
+	__HAL_TIM_SET_PRESCALER(htim, prescaler-1);
+	__HAL_TIM_SET_AUTORELOAD(htim, top-1);
 
 	// Reset and Restart counter
 	__HAL_TIM_SET_COUNTER(htim, 0);

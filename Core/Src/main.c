@@ -17,13 +17,13 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <motion_controller.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdbool.h>
 #include "hw_130.h"
-#include "motor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -170,7 +170,7 @@ int main(void)
 
   volatile motorController_struct * control_driver = NULL;
 
-  start_motion_control( &control_driver, motor_driver, 50, &htim10);
+  start_motion_control( &control_driver, motor_driver, 2000, &htim10);
 
 
 
@@ -207,13 +207,13 @@ int main(void)
 	  int pwm = 100;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
-	  HAL_Delay(2500);
-
+	  //HAL_Delay(2500);
+	  HAL_Delay(1000);
 
 	  pwm = 10;
 	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
-	  HAL_Delay(2500);
+	  HAL_Delay(1000);
 
 
 

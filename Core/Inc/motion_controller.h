@@ -11,7 +11,7 @@
  *	Allows to offset it such that the 0% corresponds to electrical stall.
  */
 
-#define PWM_ELECTRIC_MIN	 30
+#define PWM_ELECTRIC_MIN	 0
 
 /*	Max is used to reduce the V max in case the power supply is higher
  * 	than the motor's max rating.

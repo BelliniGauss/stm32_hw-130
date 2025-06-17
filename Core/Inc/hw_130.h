@@ -31,10 +31,21 @@ typedef struct hw_130_driver hw_130_driver;
 
 
 
-
-
-
-
+/**
+ * Example of correct order for driver creation and initialization:
+ *
+ * create_hw_130(...)
+ * motor_initialize(...)
+ * motor_initialize(...)
+ * motor_initialize(...)
+ * motor_initialize(...)
+ *
+ *
+ * After that, before actually using it, it should be started with:
+ *
+ * start_hw_130(...)
+ *
+ */
 
 
 
@@ -105,7 +116,7 @@ ErrorStatus start_hw_130(volatile hw_130_driver *motor_driver);
  * @param 	rotation 	 ->	direction of rotatio or stop state
  * @param 	speed 		 -> Electrical PWM fed to the motor.
  *
- * @return		-> ERROR if could not set motor
+ * @return		-> ERROR if could not set motor (wrong driver object, wront direction or wrong motor number)
  * 				-> SUCCESS if motor correctly set.
  */
 ErrorStatus motor_set(	volatile hw_130_driver *motor_driver,

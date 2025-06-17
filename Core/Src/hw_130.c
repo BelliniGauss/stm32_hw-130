@@ -11,9 +11,6 @@
 #define DIRECT_GPIO_RESET(port, pin)  	( (port)->BSRR = (uint32_t)(pin) << 16U)
 
 
-#define DIRECT_GPIO_SET(port, pin)  	( (port)->BSRR = (pin) )
-#define DIRECT_GPIO_RESET(port, pin)  	( (port)->BSRR = (uint32_t)(pin) << 16U)
-
 
 #define IS_VALID_ROTATION(x) ((x) > rotation_enum_min && (x) < rotation_enum_max)
 
@@ -93,7 +90,7 @@ __attribute__((always_inline)) static inline ErrorStatus check_driver_validity(v
  * @param 	rotation 	 ->	direction of rotatio or stop state
  * @param 	speed 		 -> Electrical PWM fed to the motor.
  *
- * @return		-> ERROR if could not set motor
+ * @return		-> ERROR if could not set motor (wrong driver object, wront direction or wrong motor number)
  * 				-> SUCCESS if motor correctly set.
  */
 ErrorStatus motor_set( 	volatile hw_130_driver *motor_driver,
@@ -101,12 +98,20 @@ ErrorStatus motor_set( 	volatile hw_130_driver *motor_driver,
 						motor_rotation rotation,
 						float e_pwm)
 {
+	//		Checks over the passed parameters.
+
+	if (check_driver_validity(motor_driver) == ERROR){
+		return ERROR;
+	}
 	if(n_motor > 4 || n_motor < 0){
 		return ERROR;
 	}
 	if( !IS_VALID_ROTATION(rotation)){
 		return ERROR;
 	}
+
+
+	//	Actual update of the morot obect's state:
 
 	motor_driver->state[n_motor].rotation = rotation;
 	motor_driver->state[n_motor].speed = e_pwm;
@@ -172,7 +177,8 @@ ErrorStatus motor_update( volatile hw_130_driver *motor_driver){
 	//	Pushing out PWM setting and control byte to shift register.
 	shift_out( motor_driver, control_byte);
 
-	//	using direct calling instead of for cycle spares 98 clock cycles, or 7.3 % over the motor_update fn...
+	//	using direct calling instead of for cycle spares 98 clock cycles,
+	// 	or 7.3 % over the motor_update fn...
 	set_duty_cycle((motor_driver->pwm_timer[0]), motor_driver->state[0].speed);
 	set_duty_cycle((motor_driver->pwm_timer[1]), motor_driver->state[1].speed);
 	set_duty_cycle((motor_driver->pwm_timer[2]), motor_driver->state[2].speed);
