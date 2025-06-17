@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <motion_controller.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -55,10 +56,6 @@
 
 
 
-TIM_HandleTypeDef htim2;
-
-
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,6 +65,8 @@ TIM_HandleTypeDef htim2;
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim10;
+TIM_HandleTypeDef htim11;
 
 /* USER CODE BEGIN PV */
 
@@ -77,6 +76,8 @@ TIM_HandleTypeDef htim2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM10_Init(void);
+static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -84,10 +85,6 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
-
-
-
 
 
 
@@ -108,6 +105,11 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
 
+	//HAL_TIM_Base_Start(&htim11);
+
+	//RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -116,6 +118,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+
 
   /* USER CODE END Init */
 
@@ -129,13 +133,27 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
+  MX_TIM10_Init();
+  MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
-  hw_130_driver motor_driver =  create_hw_130(	SR_DATA_Pin, SR_DATA_GPIO_Port,
-												SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
-												SR_LATCH_Pin, SR_LATCH_GPIO_Port);
 
 
+
+
+
+
+  /*############################
+   * HW 130 driver setup:
+   #############################
+   */
+
+
+  hw_130_driver volatile *motor_driver = NULL;
+
+  create_hw_130(&motor_driver, 	SR_DATA_Pin, SR_DATA_GPIO_Port,
+								SR_CLOCK_Pin, SR_CLOCK_GPIO_Port,
+								SR_LATCH_Pin, SR_LATCH_GPIO_Port);
 
 
   motor_initialize(motor_driver,	0, &htim2, TIM_CHANNEL_1, MOTOR_SR_1_P, MOTOR_SR_1_N, MOTOR_1_INVERT);
@@ -145,6 +163,38 @@ int main(void)
 
   start_hw_130(	motor_driver);
 
+	/*############################
+	* HW 130 driver setup:
+	#############################
+	*/
+
+  volatile motorController_struct * control_driver = NULL;
+
+  start_motion_control( &control_driver, motor_driver, 2000, &htim10);
+
+
+
+
+
+
+
+
+
+
+
+  //Starting tim11 for benchmarks:
+	RCC->APB2ENR |= RCC_APB2ENR_TIM11EN;
+	TIM11->ARR = 0xFFFF;
+	TIM11->CR1 |= TIM_CR1_CEN;
+	HAL_TIM_Base_Start(&htim11);
+
+
+
+/*	//	timer clock benchmark.
+  volatile uint16_t start = TIM11->CNT;
+  	volatile uint16_t stop = TIM11->CNT;
+  	volatile uint16_t cycle = stop - start - 9;
+  	int place_holder_interrupt = 0;*/
 
 
   /* USER CODE END 2 */
@@ -154,128 +204,27 @@ int main(void)
   while (1)
   {
 
+	  int pwm = 100;
+	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
+	  //HAL_Delay(2500);
+	  HAL_Delay(1000);
 
-	  GPIOC->ODR &= ~(1<<13);		//	LED on
-	  /*
-	   * 4 motor change + update
-	   * 156 uS @ 16 MHz -> ~2500 clock cycles.
-	   */
-	  int pwm = 75;
-	  motor_rotation direction = forwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
+	  pwm = 10;
+	  set_target_speed_all(control_driver, pwm, pwm, pwm, pwm, 200);
 
-
-	  HAL_Delay(10000);
-
-	  GPIOC->ODR = 1<<13;    		// led off
-
-	  direction = stop;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-	  HAL_Delay(3000);
-
-
-	  //########################################àààà
-
-
-	  GPIOC->ODR &= ~(1<<13);		//	LED on
-	  	  /*
-	  	   * 4 motor change + update
-	  	   * 156 uS @ 16 MHz -> ~2500 clock cycles.
-	  	   */
-	  pwm = 85;
-	  direction = forwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-
-	  HAL_Delay(10000);
-
-	  GPIOC->ODR = 1<<13;    		// led off
-
-	  direction = stop;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-	  HAL_Delay(3000);
-
-
-	  //########################################àààà
-
-
-	  GPIOC->ODR &= ~(1<<13);		//	LED on
-		  /*
-		   * 4 motor change + update
-		   * 156 uS @ 16 MHz -> ~2500 clock cycles.
-		   */
-	  pwm = 95;
-	  direction = forwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-
-	  HAL_Delay(10000);
-
-	  GPIOC->ODR = 1<<13;    		// led off
-
-	  direction = stop;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-	  HAL_Delay(3000);
+	  HAL_Delay(1000);
 
 
 
-	  //########################################àààà
 
 
-	  GPIOC->ODR &= ~(1<<13);		//	LED on
-		  /*
-		   * 4 motor change + update
-		   * 156 uS @ 16 MHz -> ~2500 clock cycles.
-		   */
-	  pwm = 100;
-	  direction = forwards;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
 
 
-	  HAL_Delay(10000);
-
-	  GPIOC->ODR = 1<<13;    		// led off
-
-	  direction = stop;
-	  motor_set(motor_driver, 0, direction, pwm);
-	  motor_set(motor_driver, 1, direction, pwm);
-	  motor_set(motor_driver, 2, direction, pwm);
-	  motor_set(motor_driver, 3, direction, pwm);
-	  update_motors(motor_driver);
-
-	  HAL_Delay(3000);
+	  //GPIOC->ODR &= ~(1<<13);		//	LED on
+	  //GPIOC->ODR = 1<<14;    		// DEBUG on
+	  //GPIOC->ODR &= ~(1<<14);		//	DEBUG off
+	  //GPIOC->ODR = 1<<13;    		// led off
 
     /* USER CODE END WHILE */
 
@@ -304,7 +253,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 16;
+  RCC_OscInitStruct.PLL.PLLN = 160;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -314,12 +268,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -345,9 +299,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 15;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 512;
+  htim2.Init.Period = 1024;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -397,6 +351,68 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM10_Init(void)
+{
+
+  /* USER CODE BEGIN TIM10_Init 0 */
+
+  /* USER CODE END TIM10_Init 0 */
+
+  /* USER CODE BEGIN TIM10_Init 1 */
+
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 0;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 65535;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM10_Init 2 */
+
+  /* USER CODE END TIM10_Init 2 */
+
+}
+
+/**
+  * @brief TIM11 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM11_Init(void)
+{
+
+  /* USER CODE BEGIN TIM11_Init 0 */
+
+  /* USER CODE END TIM11_Init 0 */
+
+  /* USER CODE BEGIN TIM11_Init 1 */
+
+  /* USER CODE END TIM11_Init 1 */
+  htim11.Instance = TIM11;
+  htim11.Init.Prescaler = 0;
+  htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim11.Init.Period = 65535;
+  htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM11_Init 2 */
+
+  /* USER CODE END TIM11_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -412,7 +428,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GPIO_GPIO_Port, LED_GPIO_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LED_GPIO_Pin|DEBUG_GPIO_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, SR_DATA_Pin|SR_CLOCK_Pin|SR_LATCH_Pin, GPIO_PIN_RESET);
@@ -423,6 +439,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DEBUG_GPIO_Pin */
+  GPIO_InitStruct.Pin = DEBUG_GPIO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DEBUG_GPIO_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SR_DATA_Pin SR_CLOCK_Pin SR_LATCH_Pin */
   GPIO_InitStruct.Pin = SR_DATA_Pin|SR_CLOCK_Pin|SR_LATCH_Pin;
