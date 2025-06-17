@@ -146,11 +146,9 @@ ErrorStatus motor_update( volatile hw_130_driver *motor_driver){
 		case stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
 			motor_driver->state[i].speed = 0;  	// for free wheeling
-			motor_driver->state[i].speed = 0;  	// for free wheeling
 			break;
 		case hard_stop:
 			//Set control bits at 0 - not really needed as it's initialised at 0!
-			motor_driver->state[i].speed = 100;		// for Hard braking.
 			motor_driver->state[i].speed = 100;		// for Hard braking.
 			break;
 		case forwards:
@@ -165,7 +163,6 @@ ErrorStatus motor_update( volatile hw_130_driver *motor_driver){
 				control_byte = control_byte | (1 << motor_driver->sr_mask_positive[i]);
 			}else{
 				control_byte = control_byte | (1 << motor_driver->sr_mask_negative[i]);
-
 			}
 			break;
 		default:
@@ -357,6 +354,7 @@ __attribute__((always_inline)) static inline void shift_out( volatile hw_130_dri
 	DIRECT_GPIO_RESET(l_port, l_pin);
 
 
+
     for (int i = 7; i >= 0; i--) {
 
     	// clock low:
@@ -386,12 +384,14 @@ __attribute__((always_inline)) static inline void shift_out( volatile hw_130_dri
 
 
 
-__attribute__((always_inline)) static inline void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
+__attribute__((always_inline)) static void set_duty_cycle(motor_pwm pwm_interface, float duty_cycle) {
 
 	// for readability we save in a nicer form the pwm data:
 	TIM_HandleTypeDef* const htim = pwm_interface.htim;
 	uint32_t channel = pwm_interface.channel;
 
+
+	// checking values within max / min
 	if (duty_cycle > 100) duty_cycle = 100;
 	if (duty_cycle < 0) duty_cycle = 0;
 
@@ -399,6 +399,7 @@ __attribute__((always_inline)) static inline void set_duty_cycle(motor_pwm pwm_i
 
 	uint16_t pw_desired = pw_resolution * duty_cycle;
 	__HAL_TIM_SET_COMPARE(htim, channel, pw_desired);
+
 
 }
 
@@ -413,5 +414,6 @@ __attribute__((always_inline)) static inline ErrorStatus check_driver_validity(v
 	}
 
 	return ERROR;
+
 
 }
